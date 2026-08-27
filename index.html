@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>Defect Inspector</h1>
+  <input type="file" id="file" accept="image/*">
+  <button onclick="run()">Inspect</button>
+  <pre id="out"></pre>
+
+<script>
+
+async function run() {
+  const out = document.getElementById("out");
+  const file = document.getElementById("file").files[0];
+  if (!file) {
+    out.textContent = "Pick an image first.";
+    return;
+  }
+  const body = new FormData();
+  body.append("file", file);
+
+  out.textContent = "Inspecting…";
+  out.style.color = "#6B7078";
+
+  const btn = document.querySelector("button");
+  btn.disabled = true;
+  try {
+  const res = await fetch("/inspect", { method: "POST", body });
+  const data = await res.json();
+
+  if (!res.ok) {
+    out.textContent = data.detail || "Inspection failed.";
+    out.style.color = "#B02318";
+    return;
+  }
+
+  out.textContent = data.verdict + "  —  defect score " + data.defect_score.toFixed(3);
+  out.style.color = data.verdict === "NOK" ? "#B02318" : "#1C6B45";
+  out.style.fontSize = "28px";
+} 
+    finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
