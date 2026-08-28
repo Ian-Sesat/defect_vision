@@ -6,6 +6,10 @@ import uvicorn
 import io
 import open_clip
 import torch
+import yaml
+
+recipe = yaml.safe_load(open("recipe.yaml"))
+THRESHOLD = recipe["threshold"]
 
 app = FastAPI()
 
@@ -15,10 +19,7 @@ model, _, preprocess = open_clip.create_model_and_transforms(
 model.eval()
 tokenizer = open_clip.get_tokenizer("ViT-B-32")
 
-texts = tokenizer([
-    "a photo of a clean metal surface",
-    "a photo of a scratched metal surface",
-])
+texts = tokenizer([recipe["ok"], recipe["defect"]])
 
 with torch.no_grad():
     text_features = model.encode_text(texts)
