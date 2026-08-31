@@ -1,43 +1,161 @@
 <!DOCTYPE html>
 <html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    background: #E9EBE6;
+    color: #15181C;
+    margin: 0;
+    padding: 32px;
+  }
+  h1 {
+    font-size: 20px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0 0 24px 0;
+  }
+  .card {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+    background: #FDFDFC;
+    border: 1px solid #C6CAC3;
+    padding: 20px;
+    max-width: 860px;
+  }
+  .stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F2F3EF;
+    min-height: 320px;
+  }
+  .stage img { max-width: 100%; display: none; }
+  #placeholder { color: #9AA0A6; font-size: 14px; margin: 0; }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6B7078;
+    margin: 0 0 8px 0;
+  }
+  .verdict {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    color: #9AA0A6;
+  }
+  .verdict.ok   { color: #1C6B45; }
+  .verdict.nok  { color: #B02318; }
+  .verdict.busy { color: #9AA0A6; font-size: 20px; letter-spacing: 0.1em; }
+  .score {
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    color: #6B7078;
+    margin-top: 8px;
+  }
+  .error { color: #B02318; font-size: 13px; margin-top: 8px; }
+  .controls { margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+
 <body>
   <h1>Defect Inspector</h1>
-  <input type="file" id="file" accept="image/*">
-  <button onclick="run()">Inspect</button>
-  <pre id="out"></pre>
+
+  <div class="card">
+    <div class="stage">
+      <img id="preview" alt="">
+      <p id="placeholder">No part loaded</p>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow">Verdict</p>
+      <div id="verdict" class="verdict">&mdash;</div>
+      <div id="score" class="score"></div>
+      <div id="error" class="error"></div>
+
+      <div class="controls">
+        <input type="file" id="file" accept="image/*">
+        <button onclick="run()">Inspect</button>
+      </div>
+    </div>
+  </div>
 
 <script>
+const fileInput = document.getElementById("file");
+const preview = document.getElementById("preview");
+const placeholder = document.getElementById("placeholder");
+const verdictEl = document.getElementById("verdict");
+const scoreEl = document.getElementById("score");
+const errorEl = document.getElementById("error");
+
+// Wipe the verdict area back to its empty state.
+function clearVerdict() {
+  verdictEl.textContent = "\u2014";
+  verdictEl.className = "verdict";
+  scoreEl.textContent = "";
+  errorEl.textContent = "";
+}
+
+// Clear the screen the moment the file dialog opens, so the old
+// image is never shown next to a new selection.
+fileInput.addEventListener("click", () => {
+  preview.style.display = "none";
+  placeholder.style.display = "block";
+  clearVerdict();
+});
+
+// Fires when the dialog closes with a file chosen.
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files[0];
+  clearVerdict();
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = "block";
+    placeholder.style.display = "none";
+  } else {
+    preview.style.display = "none";
+    placeholder.style.display = "block";
+  }
+});
 
 async function run() {
-  const out = document.getElementById("out");
-  const file = document.getElementById("file").files[0];
+  const file = fileInput.files[0];
+
   if (!file) {
-    out.textContent = "Pick an image first.";
+    errorEl.textContent = "Pick an image first.";
     return;
   }
+
   const body = new FormData();
   body.append("file", file);
 
-  out.textContent = "Inspecting…";
-  out.style.color = "#6B7078";
+  verdictEl.textContent = "Inspecting\u2026";
+  verdictEl.className = "verdict busy";
+  scoreEl.textContent = "";
+  errorEl.textContent = "";
 
   const btn = document.querySelector("button");
   btn.disabled = true;
   try {
-  const res = await fetch("/inspect", { method: "POST", body });
-  const data = await res.json();
+    const res = await fetch("/inspect", { method: "POST", body });
+    const data = await res.json();
 
-  if (!res.ok) {
-    out.textContent = data.detail || "Inspection failed.";
-    out.style.color = "#B02318";
-    return;
-  }
+    if (!res.ok) {
+      verdictEl.textContent = "\u2014";
+      verdictEl.className = "verdict";
+      errorEl.textContent = data.detail || "Inspection failed.";
+      return;
+    }
 
-  out.textContent = data.verdict + "  —  defect score " + data.defect_score.toFixed(3);
-  out.style.color = data.verdict === "NOK" ? "#B02318" : "#1C6B45";
-  out.style.fontSize = "28px";
-} 
-    finally {
+    verdictEl.textContent = data.verdict;
+    verdictEl.className = "verdict " + data.verdict.toLowerCase();
+    scoreEl.textContent = "defect score " + data.defect_score.toFixed(3)
+                        + "  \u00b7  threshold 0.30";
+  } finally {
     btn.disabled = false;
   }
 }
